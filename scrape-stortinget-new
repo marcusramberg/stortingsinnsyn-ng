@@ -36,13 +36,9 @@ if(my $res=$tx->success) {
                           periods => { $period => $party },
                       };
                       });
+                $page=-1 if !$year_res->dom->at('.mainindent a.novisit');
             }
             else {
-                my ($message,$code)=$tx->error;
-                if($code == 404) {
-                    warn "Last page - $page";
-                    $page=-1;next;
-                }
                 warn "Unable to fetch $opt_url";
            }
        }
