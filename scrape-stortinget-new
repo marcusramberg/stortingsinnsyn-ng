@@ -17,7 +17,6 @@ if(my $res=$tx->success) {
        my $page=0;
        while(++$page) {
            $opt_url->query->param(page=>$page);
-           warn "Getting $opt_url";
            my $year_tx=$ua->get($opt_url);
            if(my $year_res=$year_tx->success) {
                $year_res->dom('td ul li')->each(sub {
