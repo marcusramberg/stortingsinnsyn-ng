@@ -1,0 +1,56 @@
+#!/usr/bin/env perl
+
+use strict; use warnings;
+use Mojo::UserAgent;
+use Mojo::JSON;
+
+my $base_url=Mojo::URL->new('http://www.stortinget.no/no/Representanter-og-komiteer/Representantene/Innvalgte-fra-1945--/');
+
+my $ua=Mojo::UserAgent->new();
+my $tx=$ua->get($base_url);
+my %member=();
+if(my $res=$tx->success) {
+    $res->dom('#ctl00_MainRegion_DropDown1_eposParliamentPeriodDropDown_ddlParliamentPeriod option')->each(sub {
+       my $period=shift->attrs->{value};
+       my $opt_url=$base_url->clone->query(pid=>$period);
+       $period =~ s/\-(\d{2})$/\-19$1/;
+       my $page=0;
+       while(++$page) {
+           $opt_url->query->param(page=>$page);
+           warn "Getting $opt_url";
+           my $year_tx=$ua->get($opt_url);
+           if(my $year_res=$year_tx->success) {
+               $year_res->dom('td ul li')->each(sub {
+                   my $party=shift;
+                   my $person=${$party->children}[0];
+                   my ($perid) = Mojo::URL->new($person->attrs->{href})->query->param('perid');
+                   ($party)=$party->text =~ m/\d+\.\s*(.+)$/;
+                   if (exists $member{$perid}) {
+                       return $member{$perid}->{periods}->{$period} = $party;
+                   }
+                   my ($last_name,$first_name)=split(m/\,\s*/,$person->text);
+                   $member{$perid} =
+                      {
+                          first_name => $first_name,
+                          last_name => $last_name,
+                          periods => { $period => $party },
+                      };
+                      });
+            }
+            else {
+                my ($message,$code)=$tx->error;
+                if($code == 404) {
+                    warn "Last page - $page";
+                    $page=-1;next;
+                }
+                warn "Unable to fetch $opt_url";
+           }
+       }
+       sleep(2);
+    });
+    my $json=Mojo::JSON->new;
+    print $json->encode(\%member);
+}
+else {
+    warn "Kunne ikke hente $base_url";
+}
