@@ -19,23 +19,31 @@ if(my $res=$tx->success) {
            $opt_url->query->param(page=>$page);
            my $year_tx=$ua->get($opt_url);
            if(my $year_res=$year_tx->success) {
-               $year_res->dom('td ul li')->each(sub {
-                   my $party=shift;
-                   my $person=${$party->children}[0];
-                   my ($perid) = Mojo::URL->new($person->attrs->{href})->query->param('perid');
-                   ($party)=$party->text =~ m/\d+\.\s*(.+)$/;
-                   if (exists $member{$perid}) {
-                       return $member{$perid}->{periods}->{$period} = $party;
-                   }
-                   my ($last_name,$first_name)=split(m/\,\s*/,$person->text);
-                   $member{$perid} =
-                      {
+               last if !$year_res->dom->at('.mainindent a.novisit');
+               
+               my $region='Ukjent';
+               $year_res->dom('.mainbody > table > tr')->each(sub {
+                   my $tr=shift;
+                   my $heading=$tr->at('.subhead h4');
+                   $region=$heading->text if $heading;
+                   $tr->find('td ul li')->each(sub {
+                       my $party=shift;
+                       my $person=$party->at('a');
+                       my ($perid) = Mojo::URL->new($person->attrs->{href})->query->param('perid');
+                       ($party)=$party->text =~ m/\d+\.\s*(.+)$/;
+                       if (exists $member{$perid}) {
+                           return $member{$perid}->{periods}->{$period} = $party;
+                       }
+                       my ($last_name,$first_name)=split(m/\,\s*/,$person->text);
+                       $member{$perid} =
+                       {
+                          region => $region,
                           first_name => $first_name,
                           last_name => $last_name,
                           periods => { $period => $party },
-                      };
-                      });
-                $page=-1 if !$year_res->dom->at('.mainindent a.novisit');
+                        };
+                    });
+                });
             }
             else {
                 warn "Unable to fetch $opt_url";
